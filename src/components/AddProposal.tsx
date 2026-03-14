@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { ProposalType } from '@/lib/types'
+import { Plus, Send, X } from 'lucide-react'
 
 interface Props {
   tripId: string
@@ -31,27 +32,40 @@ export default function AddProposal({ tripId, memberId, type, onAdded }: Props) 
   if (!open) {
     return (
       <button onClick={() => setOpen(true)}
-        className="w-full py-3 rounded-2xl border border-dashed border-white/10 text-muted text-sm hover:border-accent/50 hover:text-accent hover:bg-accent/5 transition-all duration-300">
-        + Add proposal
+        className="w-full py-3.5 rounded-2xl text-sm font-medium flex items-center justify-center gap-2 transition-all hover:bg-gray-50 active:scale-[0.99]"
+        style={{ border: '1.5px dashed var(--border)', color: 'var(--muted)' }}>
+        <Plus size={16} /> Add a proposal
       </button>
     )
   }
 
   return (
-    <div className="glass rounded-2xl p-4 space-y-3 animate-fade-up">
-      <input placeholder="Title" value={title} onChange={e => setTitle(e.target.value)} autoFocus
-        className="w-full py-2.5 px-3.5 rounded-xl input-glass text-white text-sm placeholder:text-muted"
-        onKeyDown={e => e.key === 'Enter' && handleSubmit()} />
-      <input placeholder="Description (optional)" value={desc} onChange={e => setDesc(e.target.value)}
-        className="w-full py-2.5 px-3.5 rounded-xl input-glass text-white text-sm placeholder:text-muted" />
-      <div className="flex gap-2">
-        <button onClick={handleSubmit} disabled={loading}
-          className="flex-1 py-2.5 rounded-xl btn-glow text-white text-sm font-semibold disabled:opacity-50">
-          {loading ? 'Adding...' : 'Add'}
+    <div className="rounded-2xl p-4 animate-scale-in"
+      style={{ background: 'var(--card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-md)' }}>
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-sm font-semibold" style={{ color: 'var(--foreground)' }}>New proposal</p>
+        <button onClick={() => setOpen(false)} className="p-1 rounded-lg hover:bg-gray-100 transition">
+          <X size={16} style={{ color: 'var(--muted)' }} />
         </button>
-        <button onClick={() => setOpen(false)}
-          className="py-2.5 px-4 rounded-xl text-muted text-sm hover:text-white transition">Cancel</button>
       </div>
+      <div className="space-y-2.5">
+        <input placeholder="Title" value={title} onChange={e => setTitle(e.target.value)} autoFocus
+          onKeyDown={e => e.key === 'Enter' && handleSubmit()}
+          className="w-full py-2.5 px-3.5 rounded-xl text-sm focus:outline-none transition-all"
+          style={{ background: 'var(--background)', border: '1.5px solid var(--border)', color: 'var(--foreground)' }}
+          onFocus={e => e.target.style.borderColor = 'var(--accent)'}
+          onBlur={e => e.target.style.borderColor = 'var(--border)'} />
+        <input placeholder="Description (optional)" value={desc} onChange={e => setDesc(e.target.value)}
+          className="w-full py-2.5 px-3.5 rounded-xl text-sm focus:outline-none transition-all"
+          style={{ background: 'var(--background)', border: '1.5px solid var(--border)', color: 'var(--foreground)' }}
+          onFocus={e => e.target.style.borderColor = 'var(--accent)'}
+          onBlur={e => e.target.style.borderColor = 'var(--border)'} />
+      </div>
+      <button onClick={handleSubmit} disabled={loading}
+        className="w-full mt-3 py-3 rounded-xl text-white text-sm font-semibold flex items-center justify-center gap-2 transition-all hover:opacity-90 disabled:opacity-50"
+        style={{ background: 'var(--accent)' }}>
+        {loading ? 'Adding...' : <><Send size={14} /> Submit</>}
+      </button>
     </div>
   )
 }

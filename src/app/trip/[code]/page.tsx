@@ -4,14 +4,20 @@ import { useEffect, useState, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Trip, Member, ProposalWithVotes, ProposalType } from '@/lib/types'
-import { getSession, PROPOSAL_LABELS } from '@/lib/utils'
+import { getSession } from '@/lib/utils'
 import ProposalCard from '@/components/ProposalCard'
 import AddProposal from '@/components/AddProposal'
 import MembersList from '@/components/MembersList'
 import ShareButton from '@/components/ShareButton'
 import Summary from '@/components/Summary'
+import { Compass, Settings, MapPin, Calendar, Wallet, Sparkles, Trophy, ChevronDown, ChevronUp } from 'lucide-react'
 
-const TABS: ProposalType[] = ['destination', 'date', 'budget', 'activity']
+const TABS: { type: ProposalType; label: string; icon: typeof MapPin }[] = [
+  { type: 'destination', label: 'Destinations', icon: MapPin },
+  { type: 'date', label: 'Dates', icon: Calendar },
+  { type: 'budget', label: 'Budget', icon: Wallet },
+  { type: 'activity', label: 'Activities', icon: Sparkles },
+]
 
 export default function TripPage() {
   const params = useParams()
@@ -30,14 +36,11 @@ export default function TripPage() {
     const { data: tripData } = await supabase.from('trips').select().eq('code', code).single()
     if (!tripData) { router.push('/'); return }
     setTrip(tripData)
-
     const { data: membersData } = await supabase
       .from('members').select().eq('trip_id', tripData.id).order('created_at')
     setMembers(membersData || [])
-
     const { data: proposalsData } = await supabase
       .from('proposals').select('*, votes(*)').eq('trip_id', tripData.id).order('created_at')
-
     const enriched: ProposalWithVotes[] = (proposalsData || []).map(p => {
       const member = membersData?.find(m => m.id === p.member_id)
       const votes = p.votes || []
@@ -59,8 +62,8 @@ export default function TripPage() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center animate-fade-up">
-          <div className="animate-float text-4xl mb-3">🐢</div>
-          <p className="text-muted text-sm">Loading trip...</p>
+          <Compass size={32} className="mx-auto mb-3 animate-spin" style={{ color: 'var(--accent)', animationDuration: '2s' }} />
+          <p className="text-sm" style={{ color: 'var(--muted)' }}>Loading trip...</p>
         </div>
       </div>
     )
@@ -69,35 +72,33 @@ export default function TripPage() {
   const filtered = proposals.filter(p => p.type === activeTab).sort((a, b) => b.score - a.score)
 
   return (
-    <div className="min-h-screen pb-8">
+    <div className="min-h-screen pb-8" style={{ background: 'var(--background)' }}>
       {/* Header */}
-      <div className="glass border-b border-white/5 px-4 py-4 sticky top-0 z-20">
+      <div className="sticky top-0 z-20 px-4 py-3" style={{ background: 'rgba(250,250,250,0.85)', backdropFilter: 'blur(12px)', borderBottom: '1px solid var(--border)' }}>
         <div className="max-w-lg mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-accent/15 flex items-center justify-center">
-              <span className="text-lg">🐢</span>
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'var(--accent-light)' }}>
+              <Compass size={18} style={{ color: 'var(--accent)' }} />
             </div>
             <div>
-              <h1 className="text-base font-bold">{trip.name}</h1>
-              <p className="text-muted text-[11px] font-mono tracking-wider">{trip.code}</p>
+              <h1 className="text-base font-bold" style={{ color: 'var(--foreground)' }}>{trip.name}</h1>
+              <p className="text-[11px] font-mono tracking-wider" style={{ color: 'var(--muted)' }}>{trip.code}</p>
             </div>
           </div>
           <button onClick={() => router.push(`/admin/${code}`)}
-            className="text-xs text-muted hover:text-white transition px-3 py-2 rounded-xl glass">
-            Admin
+            className="p-2.5 rounded-xl transition hover:bg-gray-100" style={{ border: '1px solid var(--border)' }}>
+            <Settings size={16} style={{ color: 'var(--muted)' }} />
           </button>
         </div>
       </div>
 
-      <div className="max-w-lg mx-auto px-4 mt-5 space-y-5">
+      <div className="max-w-lg mx-auto px-4 mt-5 space-y-4">
         {/* Share */}
-        <div className="animate-fade-up">
-          <ShareButton code={trip.code} tripName={trip.name} />
-        </div>
+        <div className="animate-fade-up"><ShareButton code={trip.code} tripName={trip.name} /></div>
 
         {/* Members */}
-        <div className="animate-fade-up" style={{ animationDelay: '0.1s', opacity: 0 }}>
-          <p className="text-xs text-muted uppercase tracking-wider mb-2 font-medium">
+        <div className="animate-fade-up" style={{ animationDelay: '0.08s', opacity: 0 }}>
+          <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--muted)' }}>
             {members.length} member{members.length !== 1 ? 's' : ''}
           </p>
           <MembersList members={members} currentMemberId={session.memberId} />
@@ -105,27 +106,35 @@ export default function TripPage() {
 
         {/* Summary toggle */}
         <button onClick={() => setShowSummary(!showSummary)}
-          className="w-full flex items-center justify-between py-3 px-4 rounded-2xl glass text-sm font-medium transition animate-fade-up"
-          style={{ animationDelay: '0.15s', opacity: 0 }}>
-          <span className="flex items-center gap-2">
-            <span>🏆</span> {showSummary ? 'Hide Summary' : 'Show Summary'}
+          className="w-full flex items-center justify-between py-3 px-4 rounded-2xl text-sm font-medium transition-all hover:bg-gray-50 animate-fade-up active:scale-[0.99]"
+          style={{ background: 'var(--card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)', animationDelay: '0.12s', opacity: 0 }}>
+          <span className="flex items-center gap-2" style={{ color: 'var(--foreground)' }}>
+            <Trophy size={16} style={{ color: 'var(--orange)' }} />
+            {showSummary ? 'Hide Results' : 'View Current Results'}
           </span>
-          <span className="text-muted text-xs">{showSummary ? '▲' : '▼'}</span>
+          {showSummary ? <ChevronUp size={16} style={{ color: 'var(--muted)' }} /> : <ChevronDown size={16} style={{ color: 'var(--muted)' }} />}
         </button>
 
         {showSummary && <Summary proposals={proposals} />}
 
         {/* Tabs */}
-        <div className="flex gap-1 glass rounded-2xl p-1.5 animate-fade-up"
-          style={{ animationDelay: '0.2s', opacity: 0 }}>
-          {TABS.map(tab => (
-            <button key={tab} onClick={() => setActiveTab(tab)}
-              className={`flex-1 py-2.5 rounded-xl text-xs font-medium transition-all duration-300 ${
-                activeTab === tab ? 'tab-active text-white' : 'text-muted hover:text-white'
-              }`}>
-              {PROPOSAL_LABELS[tab].emoji} {PROPOSAL_LABELS[tab].label}
-            </button>
-          ))}
+        <div className="flex gap-1 p-1.5 rounded-2xl animate-fade-up"
+          style={{ background: 'var(--card)', border: '1px solid var(--border)', animationDelay: '0.16s', opacity: 0 }}>
+          {TABS.map(tab => {
+            const Icon = tab.icon
+            const active = activeTab === tab.type
+            return (
+              <button key={tab.type} onClick={() => setActiveTab(tab.type)}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-medium transition-all"
+                style={{
+                  background: active ? 'var(--accent)' : 'transparent',
+                  color: active ? '#fff' : 'var(--muted)',
+                  boxShadow: active ? '0 2px 8px rgba(255,107,107,0.25)' : 'none',
+                }}>
+                <Icon size={14} /> {tab.label}
+              </button>
+            )
+          })}
         </div>
 
         {/* Proposals */}
@@ -134,10 +143,16 @@ export default function TripPage() {
             <ProposalCard key={p.id} proposal={p} memberId={session.memberId} onVoted={loadData} rank={i} />
           ))}
           {filtered.length === 0 && (
-            <div className="text-center py-12 animate-fade-up">
-              <div className="text-3xl mb-2 animate-float">{PROPOSAL_LABELS[activeTab].emoji}</div>
-              <p className="text-muted text-sm">No proposals yet</p>
-              <p className="text-muted/50 text-xs mt-1">Be the first to add one!</p>
+            <div className="text-center py-16 animate-fade-up">
+              <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-3"
+                style={{ background: 'var(--accent-light)' }}>
+                {TABS.find(t => t.type === activeTab)?.icon && (() => {
+                  const Icon = TABS.find(t => t.type === activeTab)!.icon
+                  return <Icon size={24} style={{ color: 'var(--accent)' }} />
+                })()}
+              </div>
+              <p className="font-semibold text-sm" style={{ color: 'var(--foreground)' }}>No proposals yet</p>
+              <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>Be the first to add one!</p>
             </div>
           )}
           <AddProposal tripId={trip.id} memberId={session.memberId} type={activeTab} onAdded={loadData} />

@@ -1,7 +1,14 @@
 'use client'
 
 import { ProposalWithVotes } from '@/lib/types'
-import { PROPOSAL_LABELS } from '@/lib/utils'
+import { MapPin, Calendar, Wallet, Sparkles, Trophy } from 'lucide-react'
+
+const TYPE_CONFIG = {
+  destination: { icon: MapPin, label: 'Destination', color: 'var(--accent)', bg: 'var(--accent-light)' },
+  date: { icon: Calendar, label: 'Date', color: 'var(--blue)', bg: 'var(--blue-light)' },
+  budget: { icon: Wallet, label: 'Budget', color: 'var(--green)', bg: 'var(--green-light)' },
+  activity: { icon: Sparkles, label: 'Activity', color: 'var(--purple)', bg: 'var(--purple-light)' },
+} as const
 
 interface Props {
   proposals: ProposalWithVotes[]
@@ -11,38 +18,37 @@ export default function Summary({ proposals }: Props) {
   const types = ['destination', 'date', 'budget', 'activity'] as const
 
   return (
-    <div className="space-y-4 animate-fade-up">
-      <div className="flex items-center gap-2 mb-2">
-        <span className="text-xl">🏆</span>
-        <h2 className="text-base font-bold">Current Winners</h2>
-      </div>
-
+    <div className="animate-fade-up">
       <div className="grid grid-cols-2 gap-3">
         {types.map(type => {
           const items = proposals.filter(p => p.type === type).sort((a, b) => b.score - a.score)
           const winner = items[0]
-          const label = PROPOSAL_LABELS[type]
+          const config = TYPE_CONFIG[type]
+          const Icon = config.icon
 
           return (
-            <div key={type} className="glass rounded-2xl p-4 relative overflow-hidden">
-              {winner && winner.score > 0 && (
-                <div className="absolute top-0 right-0 w-12 h-12 overflow-hidden">
-                  <div className="absolute top-1 right-1 text-gold text-xs">&#9733;</div>
+            <div key={type} className="rounded-2xl p-4"
+              style={{ background: 'var(--card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}>
+              <div className="flex items-center gap-2 mb-2.5">
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: config.bg }}>
+                  <Icon size={14} style={{ color: config.color }} />
                 </div>
-              )}
-              <p className="text-xs text-muted mb-1">{label.emoji} {label.label}</p>
+                <span className="text-xs font-medium" style={{ color: 'var(--muted)' }}>{config.label}</span>
+              </div>
               {winner ? (
                 <>
-                  <p className="font-bold text-sm truncate">{winner.title}</p>
+                  <p className="font-semibold text-sm truncate" style={{ color: 'var(--foreground)' }}>{winner.title}</p>
                   <div className="flex items-center gap-1.5 mt-1.5">
-                    <span className={`text-xs font-bold ${winner.score > 0 ? 'text-green' : winner.score < 0 ? 'text-pink' : 'text-muted'}`}>
-                      {winner.score > 0 ? '+' : ''}{winner.score}
+                    {winner.score > 0 && <Trophy size={11} style={{ color: 'var(--orange)' }} />}
+                    <span className="text-xs font-semibold" style={{
+                      color: winner.score > 0 ? 'var(--green)' : winner.score < 0 ? 'var(--accent)' : 'var(--muted)',
+                    }}>
+                      {winner.score > 0 ? '+' : ''}{winner.score} votes
                     </span>
-                    <span className="text-xs text-muted">votes</span>
                   </div>
                 </>
               ) : (
-                <p className="text-xs text-muted italic mt-1">No proposals yet</p>
+                <p className="text-xs italic" style={{ color: 'var(--muted-light)' }}>No proposals yet</p>
               )}
             </div>
           )

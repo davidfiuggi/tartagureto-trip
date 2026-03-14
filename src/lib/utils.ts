@@ -1,6 +1,6 @@
 const AVATAR_COLORS = [
-  '#5666F0', '#FD6C84', '#F59E0B', '#10B981',
-  '#8B5CF6', '#EC4899', '#06B6D4', '#F97316',
+  '#FF6B6B', '#4A90D9', '#2ECC71', '#F39C12',
+  '#9B59B6', '#E17055', '#00B894', '#6C5CE7',
 ]
 
 export function randomColor(): string {
