@@ -79,19 +79,17 @@ export default function TripPage() {
     if (!trip || !session) return
     const dbType = CATEGORY_TO_DB_TYPE[category] || category
 
-    // Find existing proposal for this option
-    let proposal = proposals.find(p => p.type === dbType && p.title === optionId)
-
-    // If no proposal exists, create one
-    if (!proposal) {
-      const { data: newProposal } = await supabase
+    // Find existing proposal for this option, or create one
+    const existing = proposals.find(p => p.type === dbType && p.title === optionId)
+    const proposal = existing ?? (await (async () => {
+      const { data } = await supabase
         .from('proposals')
         .insert({ trip_id: trip.id, member_id: session.memberId, type: dbType, title: optionId })
         .select()
         .single()
-      if (!newProposal) return
-      proposal = newProposal
-    }
+      return data
+    })())
+    if (!proposal) return
 
     // Check if this member already voted on this proposal
     const existingVote = votes.find(
