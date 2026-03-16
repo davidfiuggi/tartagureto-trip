@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { Trip, Member, Vote } from '@/lib/types'
+import { Trip, Member, Vote, DbProposal, DB_TYPE_TO_CATEGORY } from '@/lib/types'
 import { Settings, Lock, ArrowLeft, Trash2, Crown, Plus, AlertTriangle } from 'lucide-react'
 
 export default function AdminPage() {
@@ -26,9 +26,21 @@ export default function AdminPage() {
     const { data: membersData } = await supabase
       .from('members').select().eq('trip_id', tripData.id).order('created_at')
     setMembers(membersData || [])
-    const { data: votesData } = await supabase
-      .from('votes').select().eq('trip_id', tripData.id)
-    setVotes(votesData || [])
+
+    // Load proposals with votes, transform to flat Vote[]
+    const { data: proposalsData } = await supabase
+      .from('proposals').select('*, votes(*)').eq('trip_id', tripData.id)
+    const dbProposals: DbProposal[] = proposalsData || []
+    const flatVotes: Vote[] = dbProposals.flatMap(p => {
+      const category = DB_TYPE_TO_CATEGORY[p.type] || p.type
+      return (p.votes || [])
+        .filter(v => v.vote === 1)
+        .map(v => ({
+          id: v.id, trip_id: p.trip_id, member_id: v.member_id,
+          category: category as Vote['category'], option_id: p.title, created_at: v.created_at,
+        }))
+    })
+    setVotes(flatVotes)
   }, [code, router])
 
   useEffect(() => { loadData() }, [loadData])
@@ -56,7 +68,8 @@ export default function AdminPage() {
   async function resetVotes() {
     if (!trip) return
     if (confirm('Reset all votes? This cannot be undone.')) {
-      await supabase.from('votes').delete().eq('trip_id', trip.id)
+      // Delete all proposals (cascades to votes)
+      await supabase.from('proposals').delete().eq('trip_id', trip.id)
       loadData()
     }
   }
@@ -133,7 +146,6 @@ export default function AdminPage() {
       </div>
 
       <div className="max-w-lg mx-auto px-4 mt-6 space-y-6">
-        {/* Members */}
         <section className="animate-fade-up">
           <h2 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--muted)' }}>
             Members ({members.length})
@@ -144,9 +156,7 @@ export default function AdminPage() {
                 style={{ background: 'var(--card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)', animationDelay: `${i * 0.04}s`, opacity: 0 }}>
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white"
-                    style={{ background: m.avatar_color }}>
-                    {m.name[0].toUpperCase()}
-                  </div>
+                    style={{ background: m.avatar_color }}>{m.name[0].toUpperCase()}</div>
                   <div>
                     <p className="text-sm font-medium" style={{ color: 'var(--foreground)' }}>{m.name}</p>
                     {m.is_admin && (
@@ -158,8 +168,7 @@ export default function AdminPage() {
                 </div>
                 {!m.is_admin && (
                   <button onClick={() => removeMember(m.id)}
-                    className="p-2 rounded-lg transition hover:bg-red-50"
-                    style={{ color: 'var(--accent)' }}>
+                    className="p-2 rounded-lg transition hover:bg-red-50" style={{ color: 'var(--accent)' }}>
                     <Trash2 size={14} />
                   </button>
                 )}
@@ -181,7 +190,6 @@ export default function AdminPage() {
           </div>
         </section>
 
-        {/* Vote Stats */}
         <section className="animate-fade-up" style={{ animationDelay: '0.1s', opacity: 0 }}>
           <h2 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--muted)' }}>
             Vote Summary
@@ -205,7 +213,6 @@ export default function AdminPage() {
           </div>
         </section>
 
-        {/* Danger */}
         <section className="rounded-2xl p-5 animate-fade-up"
           style={{ background: '#FEF2F2', border: '1px solid #FECACA', animationDelay: '0.2s', opacity: 0 }}>
           <div className="flex items-center gap-2 mb-3">

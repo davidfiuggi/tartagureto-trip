@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { Trip, Member, Vote, Section } from '@/lib/types'
+import { Trip, Member, Vote, Section, DbProposal, CATEGORY_TO_DB_TYPE, DB_TYPE_TO_CATEGORY } from '@/lib/types'
 import { destinations } from '@/lib/destinations-data'
 import { getSession } from '@/lib/utils'
 import DestinationCard from '@/components/DestinationCard'
@@ -30,6 +30,7 @@ export default function TripPage() {
   const [trip, setTrip] = useState<Trip | null>(null)
   const [members, setMembers] = useState<Member[]>([])
   const [votes, setVotes] = useState<Vote[]>([])
+  const [proposals, setProposals] = useState<DbProposal[]>([])
   const [activeSection, setActiveSection] = useState<Section>('destinations')
   const [session, setSessionState] = useState<{ memberId: string; memberName: string } | null>(null)
   const [loading, setLoading] = useState(true)
@@ -42,9 +43,28 @@ export default function TripPage() {
     const { data: membersData } = await supabase
       .from('members').select().eq('trip_id', tripData.id).order('created_at')
     setMembers(membersData || [])
-    const { data: votesData } = await supabase
-      .from('votes').select().eq('trip_id', tripData.id)
-    setVotes(votesData || [])
+
+    // Load proposals with their votes (using existing DB schema)
+    const { data: proposalsData } = await supabase
+      .from('proposals').select('*, votes(*)').eq('trip_id', tripData.id)
+    const dbProposals: DbProposal[] = proposalsData || []
+    setProposals(dbProposals)
+
+    // Transform DB proposals+votes into flat Vote[] for components
+    const flatVotes: Vote[] = dbProposals.flatMap(p => {
+      const category = DB_TYPE_TO_CATEGORY[p.type] || p.type
+      return (p.votes || [])
+        .filter(v => v.vote === 1)
+        .map(v => ({
+          id: v.id,
+          trip_id: p.trip_id,
+          member_id: v.member_id,
+          category: category as Vote['category'],
+          option_id: p.title,
+          created_at: v.created_at,
+        }))
+    })
+    setVotes(flatVotes)
     setLoading(false)
   }, [code, router])
 
@@ -57,14 +77,32 @@ export default function TripPage() {
 
   async function toggleVote(category: string, optionId: string) {
     if (!trip || !session) return
-    const existing = votes.find(
-      v => v.trip_id === trip.id && v.member_id === session.memberId && v.category === category && v.option_id === optionId,
+    const dbType = CATEGORY_TO_DB_TYPE[category] || category
+
+    // Find existing proposal for this option
+    let proposal = proposals.find(p => p.type === dbType && p.title === optionId)
+
+    // If no proposal exists, create one
+    if (!proposal) {
+      const { data: newProposal } = await supabase
+        .from('proposals')
+        .insert({ trip_id: trip.id, member_id: session.memberId, type: dbType, title: optionId })
+        .select()
+        .single()
+      if (!newProposal) return
+      proposal = newProposal
+    }
+
+    // Check if this member already voted on this proposal
+    const existingVote = votes.find(
+      v => v.category === category && v.option_id === optionId && v.member_id === session.memberId,
     )
-    if (existing) {
-      await supabase.from('votes').delete().eq('id', existing.id)
+
+    if (existingVote) {
+      await supabase.from('votes').delete().eq('id', existingVote.id)
     } else {
       await supabase.from('votes').insert({
-        trip_id: trip.id, member_id: session.memberId, category, option_id: optionId,
+        proposal_id: proposal.id, member_id: session.memberId, vote: 1,
       })
     }
     loadData()
@@ -101,7 +139,6 @@ export default function TripPage() {
   const currentIdx = SECTIONS.findIndex(s => s.id === activeSection)
   const prevSection = currentIdx > 0 ? SECTIONS[currentIdx - 1] : null
   const nextSection = currentIdx < SECTIONS.length - 1 ? SECTIONS[currentIdx + 1] : null
-
   const modalDestination = modalDest ? destinations.find(d => d.id === modalDest) : null
 
   return (
@@ -127,7 +164,6 @@ export default function TripPage() {
       </div>
 
       <div className="max-w-lg mx-auto px-4 mt-5 space-y-4">
-        {/* Share + Members */}
         <div className="animate-fade-up"><ShareButton code={trip.code} tripName={trip.name} /></div>
         <div className="animate-fade-up" style={{ animationDelay: '0.06s', opacity: 0 }}>
           <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--muted)' }}>
@@ -156,7 +192,7 @@ export default function TripPage() {
           })}
         </div>
 
-        {/* Current voter indicator */}
+        {/* Current voter */}
         <div className="rounded-xl px-4 py-2.5 animate-fade-up flex items-center gap-2"
           style={{ background: 'var(--accent-light)', border: '1px solid var(--border)', animationDelay: '0.16s', opacity: 0 }}>
           <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white"
@@ -177,42 +213,29 @@ export default function TripPage() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               {destinations.map((dest, i) => (
-                <DestinationCard
-                  key={dest.id}
-                  destination={dest}
-                  voters={getDestVoters(dest.id)}
-                  hasVoted={hasVotedDest(dest.id)}
+                <DestinationCard key={dest.id} destination={dest}
+                  voters={getDestVoters(dest.id)} hasVoted={hasVotedDest(dest.id)}
                   onToggle={() => toggleVote('destination', dest.id)}
-                  onShowDetails={() => setModalDest(dest.id)}
-                  index={i}
-                />
+                  onShowDetails={() => setModalDest(dest.id)} index={i} />
               ))}
             </div>
           </div>
         )}
 
         {activeSection === 'budget' && (
-          <BudgetVoting
-            votes={votes}
-            members={members}
-            memberId={session.memberId}
-            onToggle={id => toggleVote('budget', id)}
-          />
+          <BudgetVoting votes={votes} members={members} memberId={session.memberId}
+            onToggle={id => toggleVote('budget', id)} />
         )}
 
         {activeSection === 'when' && (
-          <WhenVoting
-            votes={votes}
-            members={members}
-            memberId={session.memberId}
+          <WhenVoting votes={votes} members={members} memberId={session.memberId}
             onToggleWeekend={id => toggleVote('weekend_type', id)}
-            onToggleMonth={id => toggleVote('month', id)}
-          />
+            onToggleMonth={id => toggleVote('month', id)} />
         )}
 
         {activeSection === 'results' && <Results votes={votes} members={members} />}
 
-        {/* Navigation buttons */}
+        {/* Navigation */}
         <div className="flex gap-3 pt-2">
           {prevSection && (
             <button onClick={() => navigateTo(prevSection.id)}
@@ -231,7 +254,6 @@ export default function TripPage() {
         </div>
       </div>
 
-      {/* Destination Modal */}
       {modalDestination && (
         <DestinationModal destination={modalDestination} onClose={() => setModalDest(null)} />
       )}
