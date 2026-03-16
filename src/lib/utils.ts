@@ -25,10 +25,3 @@ export function setSession(code: string, memberId: string, memberName: string) {
 export function clearSession(code: string) {
   localStorage.removeItem(`trip_${code}`)
 }
-
-export const PROPOSAL_LABELS: Record<string, { label: string; emoji: string }> = {
-  destination: { label: 'Destinations', emoji: '📍' },
-  date: { label: 'Dates', emoji: '📅' },
-  budget: { label: 'Budget', emoji: '💰' },
-  activity: { label: 'Activities', emoji: '🎯' },
-}

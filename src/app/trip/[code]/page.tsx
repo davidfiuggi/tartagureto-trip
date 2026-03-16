@@ -3,20 +3,23 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { Trip, Member, ProposalWithVotes, ProposalType } from '@/lib/types'
+import { Trip, Member, Vote, Section } from '@/lib/types'
+import { destinations } from '@/lib/destinations-data'
 import { getSession } from '@/lib/utils'
-import ProposalCard from '@/components/ProposalCard'
-import AddProposal from '@/components/AddProposal'
+import DestinationCard from '@/components/DestinationCard'
+import DestinationModal from '@/components/DestinationModal'
+import BudgetVoting from '@/components/BudgetVoting'
+import WhenVoting from '@/components/WhenVoting'
+import Results from '@/components/Results'
 import MembersList from '@/components/MembersList'
 import ShareButton from '@/components/ShareButton'
-import Summary from '@/components/Summary'
-import { Compass, Settings, MapPin, Calendar, Wallet, Sparkles, Trophy, ChevronDown, ChevronUp } from 'lucide-react'
+import { Compass, Settings, MapPin, Wallet, Calendar, Trophy, ArrowRight, ArrowLeft } from 'lucide-react'
 
-const TABS: { type: ProposalType; label: string; icon: typeof MapPin }[] = [
-  { type: 'destination', label: 'Destinations', icon: MapPin },
-  { type: 'date', label: 'Dates', icon: Calendar },
-  { type: 'budget', label: 'Budget', icon: Wallet },
-  { type: 'activity', label: 'Activities', icon: Sparkles },
+const SECTIONS: { id: Section; label: string; icon: typeof MapPin }[] = [
+  { id: 'destinations', label: 'Mete', icon: MapPin },
+  { id: 'budget', label: 'Budget', icon: Wallet },
+  { id: 'when', label: 'Quando', icon: Calendar },
+  { id: 'results', label: 'Risultati', icon: Trophy },
 ]
 
 export default function TripPage() {
@@ -26,11 +29,11 @@ export default function TripPage() {
 
   const [trip, setTrip] = useState<Trip | null>(null)
   const [members, setMembers] = useState<Member[]>([])
-  const [proposals, setProposals] = useState<ProposalWithVotes[]>([])
-  const [activeTab, setActiveTab] = useState<ProposalType>('destination')
-  const [showSummary, setShowSummary] = useState(false)
+  const [votes, setVotes] = useState<Vote[]>([])
+  const [activeSection, setActiveSection] = useState<Section>('destinations')
   const [session, setSessionState] = useState<{ memberId: string; memberName: string } | null>(null)
   const [loading, setLoading] = useState(true)
+  const [modalDest, setModalDest] = useState<string | null>(null)
 
   const loadData = useCallback(async () => {
     const { data: tripData } = await supabase.from('trips').select().eq('code', code).single()
@@ -39,15 +42,9 @@ export default function TripPage() {
     const { data: membersData } = await supabase
       .from('members').select().eq('trip_id', tripData.id).order('created_at')
     setMembers(membersData || [])
-    const { data: proposalsData } = await supabase
-      .from('proposals').select('*, votes(*)').eq('trip_id', tripData.id).order('created_at')
-    const enriched: ProposalWithVotes[] = (proposalsData || []).map(p => {
-      const member = membersData?.find(m => m.id === p.member_id)
-      const votes = p.votes || []
-      const score = votes.reduce((sum: number, v: { vote: number }) => sum + v.vote, 0)
-      return { ...p, member_name: member?.name || '?', score }
-    })
-    setProposals(enriched)
+    const { data: votesData } = await supabase
+      .from('votes').select().eq('trip_id', tripData.id)
+    setVotes(votesData || [])
     setLoading(false)
   }, [code, router])
 
@@ -57,6 +54,26 @@ export default function TripPage() {
     setSessionState(s)
     loadData()
   }, [code, router, loadData])
+
+  async function toggleVote(category: string, optionId: string) {
+    if (!trip || !session) return
+    const existing = votes.find(
+      v => v.trip_id === trip.id && v.member_id === session.memberId && v.category === category && v.option_id === optionId,
+    )
+    if (existing) {
+      await supabase.from('votes').delete().eq('id', existing.id)
+    } else {
+      await supabase.from('votes').insert({
+        trip_id: trip.id, member_id: session.memberId, category, option_id: optionId,
+      })
+    }
+    loadData()
+  }
+
+  function navigateTo(section: Section) {
+    setActiveSection(section)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
 
   if (loading || !trip || !session) {
     return (
@@ -69,12 +86,29 @@ export default function TripPage() {
     )
   }
 
-  const filtered = proposals.filter(p => p.type === activeTab).sort((a, b) => b.score - a.score)
+  function getDestVoters(destId: string): string[] {
+    return votes
+      .filter(v => v.category === 'destination' && v.option_id === destId)
+      .map(v => members.find(m => m.id === v.member_id)?.name || '?')
+  }
+
+  function hasVotedDest(destId: string): boolean {
+    return votes.some(
+      v => v.category === 'destination' && v.option_id === destId && v.member_id === session!.memberId,
+    )
+  }
+
+  const currentIdx = SECTIONS.findIndex(s => s.id === activeSection)
+  const prevSection = currentIdx > 0 ? SECTIONS[currentIdx - 1] : null
+  const nextSection = currentIdx < SECTIONS.length - 1 ? SECTIONS[currentIdx + 1] : null
+
+  const modalDestination = modalDest ? destinations.find(d => d.id === modalDest) : null
 
   return (
     <div className="min-h-screen pb-8" style={{ background: 'var(--background)' }}>
       {/* Header */}
-      <div className="sticky top-0 z-20 px-4 py-3" style={{ background: 'rgba(250,250,250,0.85)', backdropFilter: 'blur(12px)', borderBottom: '1px solid var(--border)' }}>
+      <div className="sticky top-0 z-20 px-4 py-3"
+        style={{ background: 'rgba(250,250,250,0.85)', backdropFilter: 'blur(12px)', borderBottom: '1px solid var(--border)' }}>
         <div className="max-w-lg mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'var(--accent-light)' }}>
@@ -93,71 +127,114 @@ export default function TripPage() {
       </div>
 
       <div className="max-w-lg mx-auto px-4 mt-5 space-y-4">
-        {/* Share */}
+        {/* Share + Members */}
         <div className="animate-fade-up"><ShareButton code={trip.code} tripName={trip.name} /></div>
-
-        {/* Members */}
-        <div className="animate-fade-up" style={{ animationDelay: '0.08s', opacity: 0 }}>
+        <div className="animate-fade-up" style={{ animationDelay: '0.06s', opacity: 0 }}>
           <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--muted)' }}>
-            {members.length} member{members.length !== 1 ? 's' : ''}
+            {members.length} partecipant{members.length !== 1 ? 'i' : 'e'}
           </p>
           <MembersList members={members} currentMemberId={session.memberId} />
         </div>
 
-        {/* Summary toggle */}
-        <button onClick={() => setShowSummary(!showSummary)}
-          className="w-full flex items-center justify-between py-3 px-4 rounded-2xl text-sm font-medium transition-all hover:bg-gray-50 animate-fade-up active:scale-[0.99]"
-          style={{ background: 'var(--card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)', animationDelay: '0.12s', opacity: 0 }}>
-          <span className="flex items-center gap-2" style={{ color: 'var(--foreground)' }}>
-            <Trophy size={16} style={{ color: 'var(--orange)' }} />
-            {showSummary ? 'Hide Results' : 'View Current Results'}
-          </span>
-          {showSummary ? <ChevronUp size={16} style={{ color: 'var(--muted)' }} /> : <ChevronDown size={16} style={{ color: 'var(--muted)' }} />}
-        </button>
-
-        {showSummary && <Summary proposals={proposals} />}
-
-        {/* Tabs */}
+        {/* Section tabs */}
         <div className="flex gap-1 p-1.5 rounded-2xl animate-fade-up"
-          style={{ background: 'var(--card)', border: '1px solid var(--border)', animationDelay: '0.16s', opacity: 0 }}>
-          {TABS.map(tab => {
-            const Icon = tab.icon
-            const active = activeTab === tab.type
+          style={{ background: 'var(--card)', border: '1px solid var(--border)', animationDelay: '0.12s', opacity: 0 }}>
+          {SECTIONS.map(s => {
+            const Icon = s.icon
+            const active = activeSection === s.id
             return (
-              <button key={tab.type} onClick={() => setActiveTab(tab.type)}
+              <button key={s.id} onClick={() => navigateTo(s.id)}
                 className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-medium transition-all"
                 style={{
                   background: active ? 'var(--accent)' : 'transparent',
                   color: active ? '#fff' : 'var(--muted)',
                   boxShadow: active ? '0 2px 8px rgba(255,107,107,0.25)' : 'none',
                 }}>
-                <Icon size={14} /> {tab.label}
+                <Icon size={14} /> {s.label}
               </button>
             )
           })}
         </div>
 
-        {/* Proposals */}
-        <div className="space-y-3">
-          {filtered.map((p, i) => (
-            <ProposalCard key={p.id} proposal={p} memberId={session.memberId} onVoted={loadData} rank={i} />
-          ))}
-          {filtered.length === 0 && (
-            <div className="text-center py-16 animate-fade-up">
-              <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-3"
-                style={{ background: 'var(--accent-light)' }}>
-                {TABS.find(t => t.type === activeTab)?.icon && (() => {
-                  const Icon = TABS.find(t => t.type === activeTab)!.icon
-                  return <Icon size={24} style={{ color: 'var(--accent)' }} />
-                })()}
-              </div>
-              <p className="font-semibold text-sm" style={{ color: 'var(--foreground)' }}>No proposals yet</p>
-              <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>Be the first to add one!</p>
+        {/* Current voter indicator */}
+        <div className="rounded-xl px-4 py-2.5 animate-fade-up flex items-center gap-2"
+          style={{ background: 'var(--accent-light)', border: '1px solid var(--border)', animationDelay: '0.16s', opacity: 0 }}>
+          <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white"
+            style={{ background: members.find(m => m.id === session.memberId)?.avatar_color || 'var(--accent)' }}>
+            {session.memberName[0].toUpperCase()}
+          </div>
+          <span className="text-xs font-medium" style={{ color: 'var(--foreground)' }}>
+            Stai votando come <strong>{session.memberName}</strong>
+          </span>
+        </div>
+
+        {/* Section content */}
+        {activeSection === 'destinations' && (
+          <div className="space-y-3">
+            <div className="text-center mb-2 animate-fade-up">
+              <h2 className="text-lg font-bold" style={{ color: 'var(--foreground)' }}>Le Possibilità</h2>
+              <p className="text-sm" style={{ color: 'var(--muted)' }}>Vota tutte le mete che ti interessano!</p>
             </div>
+            <div className="grid grid-cols-2 gap-3">
+              {destinations.map((dest, i) => (
+                <DestinationCard
+                  key={dest.id}
+                  destination={dest}
+                  voters={getDestVoters(dest.id)}
+                  hasVoted={hasVotedDest(dest.id)}
+                  onToggle={() => toggleVote('destination', dest.id)}
+                  onShowDetails={() => setModalDest(dest.id)}
+                  index={i}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {activeSection === 'budget' && (
+          <BudgetVoting
+            votes={votes}
+            members={members}
+            memberId={session.memberId}
+            onToggle={id => toggleVote('budget', id)}
+          />
+        )}
+
+        {activeSection === 'when' && (
+          <WhenVoting
+            votes={votes}
+            members={members}
+            memberId={session.memberId}
+            onToggleWeekend={id => toggleVote('weekend_type', id)}
+            onToggleMonth={id => toggleVote('month', id)}
+          />
+        )}
+
+        {activeSection === 'results' && <Results votes={votes} members={members} />}
+
+        {/* Navigation buttons */}
+        <div className="flex gap-3 pt-2">
+          {prevSection && (
+            <button onClick={() => navigateTo(prevSection.id)}
+              className="flex-1 py-3 rounded-2xl text-sm font-medium flex items-center justify-center gap-2 transition-all hover:bg-gray-50 active:scale-[0.98]"
+              style={{ border: '1.5px solid var(--border)', color: 'var(--muted)' }}>
+              <ArrowLeft size={14} /> {prevSection.label}
+            </button>
           )}
-          <AddProposal tripId={trip.id} memberId={session.memberId} type={activeTab} onAdded={loadData} />
+          {nextSection && (
+            <button onClick={() => navigateTo(nextSection.id)}
+              className="flex-1 py-3 rounded-2xl text-sm font-semibold text-white flex items-center justify-center gap-2 transition-all hover:opacity-90 active:scale-[0.98]"
+              style={{ background: 'var(--accent)', boxShadow: '0 4px 12px rgba(255,107,107,0.25)' }}>
+              {nextSection.label} <ArrowRight size={14} />
+            </button>
+          )}
         </div>
       </div>
+
+      {/* Destination Modal */}
+      {modalDestination && (
+        <DestinationModal destination={modalDestination} onClose={() => setModalDest(null)} />
+      )}
     </div>
   )
 }

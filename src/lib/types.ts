@@ -15,28 +15,15 @@ export interface Member {
   created_at: string
 }
 
-export interface Proposal {
+export interface Vote {
   id: string
   trip_id: string
   member_id: string
-  type: 'destination' | 'date' | 'budget' | 'activity'
-  title: string
-  description: string | null
+  category: 'destination' | 'budget' | 'weekend_type' | 'month'
+  option_id: string
   created_at: string
 }
 
-export interface Vote {
-  id: string
-  proposal_id: string
-  member_id: string
-  vote: 1 | -1
-  created_at: string
-}
+export type VoteCategory = Vote['category']
 
-export interface ProposalWithVotes extends Proposal {
-  votes: Vote[]
-  member_name: string
-  score: number
-}
-
-export type ProposalType = Proposal['type']
+export type Section = 'destinations' | 'budget' | 'when' | 'results'
