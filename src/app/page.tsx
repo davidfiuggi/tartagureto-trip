@@ -9,11 +9,16 @@ import { Lock, ArrowRight, Compass } from 'lucide-react'
 const TRIP_CODE = '4QWCVL'
 const TRIP_PASSWORD = 'tartagureto'
 
+const MEMBERS = [
+  'Veve', 'Ari', 'Franky', 'Marta', 'Zappy', 'Alis',
+  'Manu', 'Arma', 'Guido', 'Teo', 'Andre', 'Dave',
+]
+
 export default function Home() {
   const router = useRouter()
   const [step, setStep] = useState<'password' | 'name'>('password')
   const [password, setPassword] = useState('')
-  const [name, setName] = useState('')
+  const [selected, setSelected] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -27,7 +32,7 @@ export default function Home() {
   }
 
   async function handleJoin() {
-    if (!name.trim()) { setError('Inserisci il tuo nome'); return }
+    if (!selected) { setError('Scegli chi sei!'); return }
     setLoading(true)
     setError('')
 
@@ -37,7 +42,7 @@ export default function Home() {
 
     // Check if member already exists (returning user)
     const { data: existing } = await supabase
-      .from('members').select().eq('trip_id', trip.id).eq('name', name.trim()).single()
+      .from('members').select().eq('trip_id', trip.id).eq('name', selected).single()
     if (existing) {
       setSession(TRIP_CODE, existing.id, existing.name)
       router.push(`/trip/${TRIP_CODE}`)
@@ -47,7 +52,7 @@ export default function Home() {
     // Create new member
     const { data: member, error: memErr } = await supabase
       .from('members').insert({
-        trip_id: trip.id, name: name.trim(), avatar_color: randomColor(),
+        trip_id: trip.id, name: selected, avatar_color: randomColor(),
       }).select().single()
     if (memErr) { setError(memErr.message); setLoading(false); return }
 
@@ -119,41 +124,44 @@ export default function Home() {
 
           {step === 'name' && (
             <>
-              <div className="text-center mb-6">
+              <div className="text-center mb-5">
                 <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl mb-3"
                   style={{ background: 'var(--accent-light)' }}>
                   <Compass size={20} style={{ color: 'var(--accent)' }} />
                 </div>
                 <h2 className="text-base font-bold" style={{ color: 'var(--foreground)' }}>
-                  Come ti chiami?
+                  Chi sei?
                 </h2>
                 <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>
-                  I tuoi amici ti vedranno con questo nome
+                  Seleziona il tuo nome
                 </p>
               </div>
-              <div>
-                <input
-                  value={name}
-                  onChange={e => setName(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && handleJoin()}
-                  placeholder="Il tuo nome..."
-                  className="w-full py-3 px-4 rounded-xl text-sm text-center focus:outline-none transition-all"
-                  style={{
-                    background: 'var(--background)', border: '1.5px solid var(--border)',
-                    color: 'var(--foreground)',
-                  }}
-                  onFocus={e => e.target.style.borderColor = 'var(--accent)'}
-                  onBlur={e => e.target.style.borderColor = 'var(--border)'}
-                  autoFocus
-                />
+              <div className="grid grid-cols-3 gap-2">
+                {MEMBERS.map((m, i) => (
+                  <button
+                    key={m}
+                    onClick={() => setSelected(m)}
+                    className="py-2.5 px-2 rounded-xl text-sm font-medium transition-all active:scale-[0.95] animate-fade-up"
+                    style={{
+                      background: selected === m ? 'var(--accent)' : 'var(--background)',
+                      color: selected === m ? '#fff' : 'var(--foreground)',
+                      border: selected === m ? '2px solid var(--accent)' : '1.5px solid var(--border)',
+                      boxShadow: selected === m ? '0 2px 8px rgba(255,107,107,0.25)' : 'none',
+                      animationDelay: `${i * 0.03}s`,
+                      opacity: 0,
+                    }}
+                  >
+                    {m}
+                  </button>
+                ))}
               </div>
               {error && <p className="text-sm mt-3 text-center animate-fade-in" style={{ color: 'var(--accent)' }}>{error}</p>}
               <button
                 onClick={handleJoin}
-                disabled={loading}
-                className="w-full mt-4 py-3.5 rounded-2xl text-white font-semibold text-sm flex items-center justify-center gap-2 transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-50"
+                disabled={loading || !selected}
+                className="w-full mt-5 py-3.5 rounded-2xl text-white font-semibold text-sm flex items-center justify-center gap-2 transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-50"
                 style={{ background: 'var(--accent)' }}>
-                {loading ? 'Entro...' : <>Entra <ArrowRight size={16} /></>}
+                {loading ? 'Entro...' : <>Entra come {selected || '...'} <ArrowRight size={16} /></>}
               </button>
             </>
           )}

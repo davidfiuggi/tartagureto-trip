@@ -14,7 +14,6 @@ import BudgetVoting from '@/components/BudgetVoting'
 import WhenVoting from '@/components/WhenVoting'
 import Results from '@/components/Results'
 import MembersList from '@/components/MembersList'
-import ShareButton from '@/components/ShareButton'
 import { Compass, Settings, MapPin, Wallet, Calendar, Trophy, ArrowRight, ArrowLeft } from 'lucide-react'
 
 const SECTIONS: { id: Section; label: string; icon: typeof MapPin }[] = [
@@ -181,10 +180,7 @@ export default function TripPage() {
             <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'var(--accent-light)' }}>
               <Compass size={18} style={{ color: 'var(--accent)' }} />
             </div>
-            <div>
-              <h1 className="text-base font-bold" style={{ color: 'var(--foreground)' }}>{trip.name}</h1>
-              <p className="text-[11px] font-mono tracking-wider" style={{ color: 'var(--muted)' }}>{trip.code}</p>
-            </div>
+            <h1 className="text-base font-bold" style={{ color: 'var(--foreground)' }}>{trip.name}</h1>
           </div>
           <button onClick={() => router.push(`/admin/${code}`)}
             className="p-2.5 rounded-xl transition hover:bg-gray-100" style={{ border: '1px solid var(--border)' }}>
@@ -194,8 +190,7 @@ export default function TripPage() {
       </div>
 
       <div className="max-w-lg mx-auto px-4 mt-5 space-y-4">
-        <div className="animate-fade-up"><ShareButton code={trip.code} tripName={trip.name} /></div>
-        <div className="animate-fade-up" style={{ animationDelay: '0.06s', opacity: 0 }}>
+        <div className="animate-fade-up">
           <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--muted)' }}>
             {members.length} partecipant{members.length !== 1 ? 'i' : 'e'}
           </p>
