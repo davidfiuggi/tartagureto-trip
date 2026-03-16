@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase'
 import { Trip, Member, Vote, DbProposal, DB_TYPE_TO_CATEGORY } from '@/lib/types'
 import AdminMembers from '@/components/AdminMembers'
 import AdminDestinations from '@/components/AdminDestinations'
+import AdminVotes from '@/components/AdminVotes'
 import { Settings, Lock, ArrowLeft, AlertTriangle, User } from 'lucide-react'
 
 const ADMIN_USER = 'admin'
@@ -133,10 +134,6 @@ export default function AdminPage() {
     )
   }
 
-  const destVotes = votes.filter(v => v.category === 'destination').length
-  const budgetVotesCount = votes.filter(v => v.category === 'budget').length
-  const whenVotes = votes.filter(v => v.category === 'weekend_type' || v.category === 'month').length
-
   return (
     <div className="min-h-screen pb-8" style={{ background: 'var(--background)' }}>
       <div className="sticky top-0 z-20 px-4 py-3"
@@ -164,29 +161,7 @@ export default function AdminPage() {
 
         <AdminDestinations proposals={proposals} onReload={loadData} />
 
-        {/* Vote summary */}
-        <section className="animate-fade-up" style={{ animationDelay: '0.15s', opacity: 0 }}>
-          <h2 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--muted)' }}>
-            Riepilogo Voti
-          </h2>
-          <div className="grid grid-cols-3 gap-2">
-            <div className="rounded-xl p-3 text-center"
-              style={{ background: 'var(--accent-light)', border: '1px solid var(--border)' }}>
-              <p className="text-lg font-bold" style={{ color: 'var(--accent)' }}>{destVotes}</p>
-              <p className="text-[10px]" style={{ color: 'var(--muted)' }}>Destinazioni</p>
-            </div>
-            <div className="rounded-xl p-3 text-center"
-              style={{ background: 'var(--green-light)', border: '1px solid var(--border)' }}>
-              <p className="text-lg font-bold" style={{ color: 'var(--green)' }}>{budgetVotesCount}</p>
-              <p className="text-[10px]" style={{ color: 'var(--muted)' }}>Budget</p>
-            </div>
-            <div className="rounded-xl p-3 text-center"
-              style={{ background: 'var(--blue-light)', border: '1px solid var(--border)' }}>
-              <p className="text-lg font-bold" style={{ color: 'var(--blue)' }}>{whenVotes}</p>
-              <p className="text-[10px]" style={{ color: 'var(--muted)' }}>Quando</p>
-            </div>
-          </div>
-        </section>
+        <AdminVotes votes={votes} members={members} onReload={loadData} />
 
         {/* Danger zone */}
         <section className="rounded-2xl p-5 animate-fade-up"
@@ -196,20 +171,27 @@ export default function AdminPage() {
             <h2 className="text-sm font-semibold" style={{ color: 'var(--accent)' }}>Zona Pericolosa</h2>
           </div>
           <p className="text-xs mb-3" style={{ color: 'var(--muted)' }}>Queste azioni sono irreversibili.</p>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <button onClick={resetVotes}
               className="text-xs font-medium px-4 py-2 rounded-xl transition hover:bg-red-100"
               style={{ color: 'var(--orange)', border: '1px solid var(--orange)' }}>
               Reset voti
             </button>
             <button onClick={async () => {
-              if (confirm('Eliminare il viaggio e TUTTI i dati? Non si puo annullare.')) {
-                await supabase.from('trips').delete().eq('id', trip.id)
-                router.push('/')
-              }
+              if (!confirm('Eliminare TUTTI i membri? I voti rimarranno.')) return
+              await supabase.from('members').delete().eq('trip_id', trip.id)
+              loadData()
+            }} className="text-xs font-medium px-4 py-2 rounded-xl transition hover:bg-red-100"
+              style={{ color: 'var(--orange)', border: '1px solid var(--orange)' }}>
+              Reset membri
+            </button>
+            <button onClick={async () => {
+              if (!confirm('Reset TOTALE: elimina viaggio, membri, voti e proposte. Il viaggio verra ricreato automaticamente.')) return
+              await supabase.from('trips').delete().eq('id', trip.id)
+              router.push('/')
             }} className="text-xs font-medium px-4 py-2 rounded-xl transition hover:bg-red-100"
               style={{ color: 'var(--accent)', border: '1px solid var(--accent)' }}>
-              Elimina viaggio
+              Reset totale
             </button>
           </div>
         </section>

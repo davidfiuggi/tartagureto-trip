@@ -36,9 +36,18 @@ export default function Home() {
     setLoading(true)
     setError('')
 
-    const { data: trip } = await supabase
+    let { data: trip } = await supabase
       .from('trips').select().eq('code', TRIP_CODE).single()
-    if (!trip) { setError('Trip not found'); setLoading(false); return }
+    if (!trip) {
+      // Auto-create the single trip if it doesn't exist
+      const { data: created } = await supabase
+        .from('trips')
+        .insert({ name: 'Tartagureto Beach 2026', code: TRIP_CODE, admin_password: 'admin' })
+        .select()
+        .single()
+      trip = created
+    }
+    if (!trip) { setError('Errore nella creazione del viaggio'); setLoading(false); return }
 
     // Check if member already exists (returning user)
     const { data: existing } = await supabase
