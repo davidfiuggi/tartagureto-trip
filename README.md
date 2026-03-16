@@ -16,14 +16,21 @@ Deployed on Vercel: `tartagureto.vercel.app`
    - **Quando** — Weekend type (2/3/4 days) + month (June-September)
    - **Risultati** — Live results with winner cards, destination ranking, and celebration overlay
 
+## Single Trip Architecture
+
+The app manages a single hardcoded trip (code `4QWCVL`). If the trip is deleted (from admin or directly from Supabase), it is automatically recreated the next time someone visits the homepage. No manual setup required.
+
 ## Admin Panel
 
 Access via the gear icon in the trip header, login with `admin` / `admin`.
 
-- **Member management** — Add, remove, or merge duplicate members (transfers all votes)
+- **Member management** — Add, remove, or merge duplicate members (transfers all votes and proposal ownership)
 - **Custom destinations** — Rename or delete user-proposed destinations
-- **Vote summary** — Overview of vote counts per category
-- **Danger zone** — Reset all votes or delete the trip
+- **Vote management** — View all votes grouped by category (Destinations, Budget, Weekend, Month), delete individual votes or all votes for a category
+- **Danger zone** — Three reset levels:
+  - _Reset voti_ — Deletes all proposals and votes
+  - _Reset membri_ — Deletes all members (votes remain)
+  - _Reset totale_ — Deletes the entire trip (auto-recreated on next visit)
 
 ## Tech Stack
 
@@ -61,7 +68,7 @@ src/
     MembersList.tsx             # Horizontal members display
     AdminMembers.tsx            # Admin member management + merge
     AdminDestinations.tsx       # Admin custom destination management
-    ShareButton.tsx             # Share button (currently unused)
+    AdminVotes.tsx              # Admin vote viewing + deletion per category
   lib/
     supabase.ts                 # Supabase client
     types.ts                    # TypeScript types + DB mappings
