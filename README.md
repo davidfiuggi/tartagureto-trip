@@ -1,36 +1,91 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Tartagureto Beach 2026
 
-## Getting Started
+A group trip planning webapp where friends vote on destinations, budget, and timing together.
 
-First, run the development server:
+## Live
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+Deployed on Vercel: `tartagureto.vercel.app`
+
+## How It Works
+
+1. **Enter password** (`tartagureto`) to access the trip
+2. **Pick your name** from the 12-member list (Veve, Ari, Franky, Marta, Zappy, Alis, Manu, Arma, Guido, Teo, Andre, Dave)
+3. **Vote** across 4 sections:
+   - **Mete** — 7 predefined Italian beach destinations + custom proposals with Unsplash image search
+   - **Budget** — Per-night budget preference (50-100, 100-150, 150-200, 200+)
+   - **Quando** — Weekend type (2/3/4 days) + month (June-September)
+   - **Risultati** — Live results with winner cards, destination ranking, and celebration overlay
+
+## Admin Panel
+
+Access via the gear icon in the trip header, login with `admin` / `admin`.
+
+- **Member management** — Add, remove, or merge duplicate members (transfers all votes)
+- **Custom destinations** — Rename or delete user-proposed destinations
+- **Vote summary** — Overview of vote counts per category
+- **Danger zone** — Reset all votes or delete the trip
+
+## Tech Stack
+
+- **Next.js 16** (App Router) + TypeScript + Tailwind CSS
+- **Supabase** (PostgreSQL) — trips, members, proposals, votes tables
+- **Unsplash API** — Image search for custom destination proposals
+- **Vercel** — Auto-deploy from GitHub
+
+## Environment Variables
+
+```
+NEXT_PUBLIC_SUPABASE_URL=<supabase-url>
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<supabase-anon-key>
+NEXT_PUBLIC_UNSPLASH_ACCESS_KEY=<unsplash-access-key>
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+These must be set both in `.env.local` (local dev) and in Vercel environment variables (production).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Project Structure
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```
+src/
+  app/
+    page.tsx                    # Homepage (password + name picker)
+    trip/[code]/page.tsx        # Main trip page (voting sections)
+    admin/[code]/page.tsx       # Admin panel
+  components/
+    DestinationCard.tsx         # Predefined destination card
+    CustomDestinationCard.tsx   # User-proposed destination card
+    DestinationModal.tsx        # Destination detail modal
+    AddDestination.tsx          # Custom destination proposal form
+    BudgetVoting.tsx            # Budget voting section
+    WhenVoting.tsx              # When voting section (weekend + month)
+    Results.tsx                 # Results with rankings and celebration
+    MembersList.tsx             # Horizontal members display
+    AdminMembers.tsx            # Admin member management + merge
+    AdminDestinations.tsx       # Admin custom destination management
+    ShareButton.tsx             # Share button (currently unused)
+  lib/
+    supabase.ts                 # Supabase client
+    types.ts                    # TypeScript types + DB mappings
+    destinations-data.ts        # 7 predefined Italian destinations
+    voting-options.ts           # Budget, weekend, month options
+    unsplash.ts                 # Unsplash API search
+    utils.ts                    # Session management, helpers
+```
 
-## Learn More
+## DB Schema (existing Supabase tables)
 
-To learn more about Next.js, take a look at the following resources:
+- **trips** — `id, name, code, admin_password, created_at`
+- **members** — `id, trip_id, name, avatar_color, is_admin, created_at`
+- **proposals** — `id, trip_id, member_id, type, title, description, created_at`
+- **votes** — `id, proposal_id, member_id, vote, created_at`
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Vote categories map to proposal types: `destination→destination`, `budget→budget`, `weekend_type→date`, `month→activity`.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Custom destinations store the Unsplash image URL in the `description` field.
 
-## Deploy on Vercel
+## Development
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npm install
+npm run dev     # http://localhost:3000
+npm run build   # Production build
+```
