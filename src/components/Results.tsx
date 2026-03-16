@@ -6,9 +6,16 @@ import { destinations } from '@/lib/destinations-data'
 import { budgetOptions, weekendTypes, availableMonths } from '@/lib/voting-options'
 import { Trophy } from 'lucide-react'
 
+interface CustomDest {
+  id: string
+  name: string
+  imageUrl: string
+}
+
 interface Props {
   votes: Vote[]
   members: Member[]
+  customDests?: CustomDest[]
 }
 
 interface Winner {
@@ -36,7 +43,7 @@ function getWinner(
   return { name: (found as { name?: string; label?: string })?.name || (found as { label?: string })?.label || best, count: bestCount, icon: '' }
 }
 
-function getRanking(votes: Vote[], members: Member[]) {
+function getRanking(votes: Vote[], members: Member[], customDests: CustomDest[] = []) {
   const destVotes: Record<string, string[]> = {}
   votes
     .filter(v => v.category === 'destination')
@@ -49,25 +56,26 @@ function getRanking(votes: Vote[], members: Member[]) {
   return Object.entries(destVotes)
     .map(([id, voters]) => ({
       id,
-      name: destinations.find(d => d.id === id)?.name || id,
+      name: destinations.find(d => d.id === id)?.name || customDests.find(c => c.id === id)?.name || id,
       voters,
       count: voters.length,
     }))
     .sort((a, b) => b.count - a.count)
 }
 
-export default function Results({ votes, members }: Props) {
+export default function Results({ votes, members, customDests = [] }: Props) {
   const [celebrating, setCelebrating] = useState(false)
 
-  const destWinner = getWinner(
-    votes,
-    'destination',
-    destinations.map(d => ({ id: d.id, name: d.name })),
-  )
+  // Merge predefined + custom destinations for winner calculation
+  const allDestOptions = [
+    ...destinations.map(d => ({ id: d.id, name: d.name })),
+    ...customDests.map(c => ({ id: c.id, name: c.name })),
+  ]
+  const destWinner = getWinner(votes, 'destination', allDestOptions)
   const budgetWinner = getWinner(votes, 'budget', budgetOptions.map(b => ({ id: b.id, name: b.label })))
   const weekendWinner = getWinner(votes, 'weekend_type', weekendTypes.map(w => ({ id: w.id, name: `${w.icon} ${w.name}` })))
   const monthWinner = getWinner(votes, 'month', availableMonths.map(m => ({ id: m.id, name: m.name })))
-  const ranking = getRanking(votes, members)
+  const ranking = getRanking(votes, members, customDests)
 
   function celebrate() {
     setCelebrating(true)

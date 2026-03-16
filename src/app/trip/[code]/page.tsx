@@ -7,7 +7,9 @@ import { Trip, Member, Vote, Section, DbProposal, CATEGORY_TO_DB_TYPE, DB_TYPE_T
 import { destinations } from '@/lib/destinations-data'
 import { getSession } from '@/lib/utils'
 import DestinationCard from '@/components/DestinationCard'
+import CustomDestinationCard from '@/components/CustomDestinationCard'
 import DestinationModal from '@/components/DestinationModal'
+import AddDestination from '@/components/AddDestination'
 import BudgetVoting from '@/components/BudgetVoting'
 import WhenVoting from '@/components/WhenVoting'
 import Results from '@/components/Results'
@@ -22,6 +24,15 @@ const SECTIONS: { id: Section; label: string; icon: typeof MapPin }[] = [
   { id: 'results', label: 'Risultati', icon: Trophy },
 ]
 
+// IDs of predefined destinations (from destinations-data.ts)
+const PREDEFINED_IDS = new Set(destinations.map(d => d.id))
+
+export interface CustomDest {
+  id: string      // proposal title used as vote option_id
+  name: string
+  imageUrl: string
+}
+
 export default function TripPage() {
   const params = useParams()
   const router = useRouter()
@@ -31,6 +42,7 @@ export default function TripPage() {
   const [members, setMembers] = useState<Member[]>([])
   const [votes, setVotes] = useState<Vote[]>([])
   const [proposals, setProposals] = useState<DbProposal[]>([])
+  const [customDests, setCustomDests] = useState<CustomDest[]>([])
   const [activeSection, setActiveSection] = useState<Section>('destinations')
   const [session, setSessionState] = useState<{ memberId: string; memberName: string } | null>(null)
   const [loading, setLoading] = useState(true)
@@ -44,11 +56,20 @@ export default function TripPage() {
       .from('members').select().eq('trip_id', tripData.id).order('created_at')
     setMembers(membersData || [])
 
-    // Load proposals with their votes (using existing DB schema)
     const { data: proposalsData } = await supabase
       .from('proposals').select('*, votes(*)').eq('trip_id', tripData.id)
     const dbProposals: DbProposal[] = proposalsData || []
     setProposals(dbProposals)
+
+    // Extract custom destinations (destination proposals not in predefined list)
+    const customs: CustomDest[] = dbProposals
+      .filter(p => p.type === 'destination' && !PREDEFINED_IDS.has(p.title))
+      .map(p => ({
+        id: p.title,
+        name: p.title,
+        imageUrl: p.description || '',
+      }))
+    setCustomDests(customs)
 
     // Transform DB proposals+votes into flat Vote[] for components
     const flatVotes: Vote[] = dbProposals.flatMap(p => {
@@ -79,7 +100,6 @@ export default function TripPage() {
     if (!trip || !session) return
     const dbType = CATEGORY_TO_DB_TYPE[category] || category
 
-    // Find existing proposal for this option, or create one
     const existing = proposals.find(p => p.type === dbType && p.title === optionId)
     const proposal = existing ?? (await (async () => {
       const { data } = await supabase
@@ -91,7 +111,6 @@ export default function TripPage() {
     })())
     if (!proposal) return
 
-    // Check if this member already voted on this proposal
     const existingVote = votes.find(
       v => v.category === category && v.option_id === optionId && v.member_id === session.memberId,
     )
@@ -103,6 +122,19 @@ export default function TripPage() {
         proposal_id: proposal.id, member_id: session.memberId, vote: 1,
       })
     }
+    loadData()
+  }
+
+  async function addCustomDestination(name: string, imageUrl: string) {
+    if (!trip || !session) return
+    // Create proposal with image URL in description field
+    await supabase.from('proposals').insert({
+      trip_id: trip.id,
+      member_id: session.memberId,
+      type: 'destination',
+      title: name,
+      description: imageUrl,
+    })
     loadData()
   }
 
@@ -206,17 +238,26 @@ export default function TripPage() {
         {activeSection === 'destinations' && (
           <div className="space-y-3">
             <div className="text-center mb-2 animate-fade-up">
-              <h2 className="text-lg font-bold" style={{ color: 'var(--foreground)' }}>Le Possibilità</h2>
+              <h2 className="text-lg font-bold" style={{ color: 'var(--foreground)' }}>Le Possibilita</h2>
               <p className="text-sm" style={{ color: 'var(--muted)' }}>Vota tutte le mete che ti interessano!</p>
             </div>
             <div className="grid grid-cols-2 gap-3">
+              {/* Predefined destinations */}
               {destinations.map((dest, i) => (
                 <DestinationCard key={dest.id} destination={dest}
                   voters={getDestVoters(dest.id)} hasVoted={hasVotedDest(dest.id)}
                   onToggle={() => toggleVote('destination', dest.id)}
                   onShowDetails={() => setModalDest(dest.id)} index={i} />
               ))}
+              {/* Custom destinations */}
+              {customDests.map((cd, i) => (
+                <CustomDestinationCard key={cd.id} name={cd.name} imageUrl={cd.imageUrl}
+                  voters={getDestVoters(cd.id)} hasVoted={hasVotedDest(cd.id)}
+                  onToggle={() => toggleVote('destination', cd.id)}
+                  index={destinations.length + i} />
+              ))}
             </div>
+            <AddDestination onAdd={addCustomDestination} />
           </div>
         )}
 
@@ -231,7 +272,9 @@ export default function TripPage() {
             onToggleMonth={id => toggleVote('month', id)} />
         )}
 
-        {activeSection === 'results' && <Results votes={votes} members={members} />}
+        {activeSection === 'results' && (
+          <Results votes={votes} members={members} customDests={customDests} />
+        )}
 
         {/* Navigation */}
         <div className="flex gap-3 pt-2">
